@@ -38,10 +38,10 @@ def generate_brief(topic: str, client: Optional[Groq] = None) -> str:
         client = Groq(api_key=api_key)
 
     primary_model = "groq/compound-mini"
-    primary_prompt = f"Research this topic using web search and reply with exactly 3 concise bullet points:\n\nTopic: {cleaned_topic}"
+    primary_prompt = f"Conduct focused research on this topic using web search and reply with exactly 3 high-impact, concise bullet points:\n\nTopic: {cleaned_topic}"
 
     fallback_model = "llama-3.1-8b-instant"
-    fallback_prompt = f"Note: Answering from internal knowledge. Research this topic and reply with exactly 3 concise bullet points:\n\nTopic: {cleaned_topic}"
+    fallback_prompt = f"Note: Answering from internal knowledge. Conduct focused research on this topic and reply with exactly 3 high-impact, concise bullet points:\n\nTopic: {cleaned_topic}"
 
     emergency_model = "openai/gpt-oss-20b"
 
@@ -50,7 +50,7 @@ def generate_brief(topic: str, client: Optional[Groq] = None) -> str:
         response = client.chat.completions.create(
             model=primary_model,
             messages=[
-                {"role": "system", "content": "You are a research assistant. Always reply with exactly 3 concise bullet points starting with '-' or '*'."},
+                {"role": "system", "content": "You are an elite research assistant. Always reply with exactly 3 concise bullet points starting with '-' or '*'."},
                 {"role": "user", "content": primary_prompt}
             ],
             temperature=0.3,
@@ -68,7 +68,7 @@ def generate_brief(topic: str, client: Optional[Groq] = None) -> str:
         response = client.chat.completions.create(
             model=fallback_model,
             messages=[
-                {"role": "system", "content": "You are a research assistant answering from your own knowledge. Always reply with exactly 3 concise bullet points starting with '-' or '*'."},
+                {"role": "system", "content": "You are an elite research assistant answering from your own knowledge. Always reply with exactly 3 concise bullet points starting with '-' or '*'."},
                 {"role": "user", "content": fallback_prompt}
             ],
             temperature=0.3,
@@ -86,7 +86,7 @@ def generate_brief(topic: str, client: Optional[Groq] = None) -> str:
         response = client.chat.completions.create(
             model=emergency_model,
             messages=[
-                {"role": "system", "content": "You are a research assistant answering from your own knowledge. Always reply with exactly 3 concise bullet points starting with '-' or '*'."},
+                {"role": "system", "content": "You are an elite research assistant answering from your own knowledge. Always reply with exactly 3 concise bullet points starting with '-' or '*'."},
                 {"role": "user", "content": fallback_prompt}
             ],
             temperature=0.3,
@@ -102,9 +102,9 @@ def generate_brief(topic: str, client: Optional[Groq] = None) -> str:
         return f"Error generating brief: {str(e_emergency)}"
 
 def main():
-    st.set_page_config(page_title="Task-Automation Agent", page_icon="🤖")
-    st.title("🤖 Task-Automation Agent: Research Brief Generator")
-    st.write("Enter any topic below to receive an automated 3-bullet research brief.")
+    st.set_page_config(page_title="Task-Automation Agent v2.0", page_icon="⚡")
+    st.title("⚡ Task-Automation Agent: Fast Research Brief Generator (v2.0)")
+    st.write("Enter any topic below to receive an automated 3-bullet high-impact research brief.")
 
     topic_input = st.text_input("Enter a topic for research:", placeholder="e.g. MLOps Best Practices 2026")
 
@@ -117,7 +117,7 @@ def main():
                 if brief.startswith("Error"):
                     st.error(brief)
                 else:
-                    st.subheader("Research Brief")
+                    st.subheader("Research Brief (v2.0)")
                     st.markdown(brief)
 
 if __name__ == "__main__":

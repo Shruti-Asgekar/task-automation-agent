@@ -4,7 +4,7 @@ FROM python:3.11-slim
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
-# Create a non-root user with UID 1000 (standard for Hugging Face Spaces)
+# Create a non-root user with UID 1000
 RUN useradd -m -u 1000 user
 
 # Switch to non-root user
@@ -24,5 +24,5 @@ COPY --chown=user . $HOME/app/
 # Expose port 7860
 EXPOSE 7860
 
-# Run Streamlit on 0.0.0.0:7860 headless
-CMD ["streamlit", "run", "app.py", "--server.port=7860", "--server.address=0.0.0.0", "--server.headless=true"]
+# Run Streamlit on 0.0.0.0:${PORT:-7860} headless
+CMD ["sh", "-c", "streamlit run app.py --server.port=${PORT:-7860} --server.address=0.0.0.0 --server.headless=true"]

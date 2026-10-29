@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: task-automation-agent
+    runtime: docker
+    plan: free
+    branch: main
+    autoDeploy: true
+    envVars:
+      - key: GROQ_API_KEY
+        sync: false
+      - key: PORT
+        value: 7860

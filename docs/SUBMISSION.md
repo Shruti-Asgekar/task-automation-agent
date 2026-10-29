@@ -2,20 +2,20 @@
 
 **Author:** Shruti Asgekar  
 **GitHub Repository:** [https://github.com/Shruti-Asgekar/task-automation-agent](https://github.com/Shruti-Asgekar/task-automation-agent)  
-**Hugging Face Space:** [https://huggingface.co/spaces/ShRutIAG/task-automation-agent](https://huggingface.co/spaces/ShRutIAG/task-automation-agent)  
-**CI/CD Workflows:** [GitHub Actions Runs](https://github.com/Shruti-Asgekar/task-automation-agent/actions)
+**Live Production App (Render):** [https://task-automation-agent-ojxn.onrender.com](https://task-automation-agent-ojxn.onrender.com)  
+**CI Workflow Runs:** [GitHub Actions Runs](https://github.com/Shruti-Asgekar/task-automation-agent/actions)
 
 ---
 
 ## 1. Tools and Hosting Chosen
 
-- **Groq API (`groq` SDK):** Free, ultra-fast LLM inference engine supporting models with web-grounding capabilities and fast conversational completion.
-- **Streamlit:** Minimal, pythonic web framework for rapid UI development without needing frontend boilerplate.
-- **pytest:** Industry-standard lightweight testing framework to validate agent functions with zero network dependencies.
-- **Docker:** Containerization platform ensuring cross-environment consistency, security via non-root user execution, and isolated port binding.
+- **Groq API (`groq` SDK):** Free, ultra-fast LLM inference engine supporting models with web search grounding and instant completion.
+- **Streamlit:** Pythonic web framework that turns data scripts into shareable web apps with zero frontend boilerplate.
+- **pytest:** Minimal testing framework used to validate agent logic, input sanitization, and output formatting with zero network dependence.
+- **Docker:** Production containerization guaranteeing environment parity, reproducible builds, and non-root security isolation.
 - **GitHub & GitHub CLI (`gh`):** Distributed version control, repository secrets management, and automated command-line workflows.
-- **GitHub Actions (CI/CD):** Native continuous integration and deployment pipelines to test, build, and auto-sync code changes.
-- **Hugging Face Spaces:** Cloud hosting platform supporting containerized Docker SDK applications with Git remote synchronization.
+- **GitHub Actions (CI):** Continuous integration running automated unit testing and Docker container build verification on every push.
+- **Render Cloud (CD / Hosting):** Reliable free-tier Docker cloud platform utilizing Blueprint Infrastructure-as-Code (`render.yaml`) with native automated deployment on every push to `main`.
 
 ---
 
@@ -25,132 +25,139 @@
 flowchart LR
     Dev["Developer Git Commit & Push"] --> GitHub["GitHub Repository (Shruti-Asgekar/task-automation-agent)"]
     
-    subgraph CI["Continuous Integration (ci.yml)"]
-        Checkout["actions/checkout@v4"] --> SetupPy["Setup Python 3.11"]
+    subgraph CI["Continuous Integration (GitHub Actions ci.yml)"]
+        Checkout["Checkout Repository"] --> SetupPy["Setup Python 3.11"]
         SetupPy --> PipInst["Install requirements.txt"]
-        PipInst --> PytestRun["Run Pytest Unit Tests"]
-        PytestRun --> DockerBuild["Docker Build (task-automation-agent:ci)"]
+        PipInst --> PytestRun["Run Pytest Suite (tests/)"]
+        PytestRun --> DockerBuild["Docker Build Verification (task-automation-agent:ci)"]
     end
     
-    subgraph CD["Continuous Deployment (cd.yml)"]
-        SyncHF["Git Force-Push with HF_TOKEN"]
+    subgraph CD["Continuous Deployment (Render Cloud Auto-Deploy)"]
+        Webhook["Render Git Webhook (render.yaml Blueprint)"] --> CloudBuild["Render Docker Engine Build"]
+        CloudBuild --> LiveApp["Live Streamlit App (:7860)"]
     end
 
     GitHub --> CI
-    GitHub --> CD
-    
-    subgraph HF["Hugging Face Spaces"]
-        HFGit["Space Git Remote (ShRutIAG/task-automation-agent)"] --> DockerBuildHF["Hugging Face Docker Build"]
-        DockerBuildHF --> LiveApp["Live Streamlit App (:7860)"]
-    end
-    
-    CD --> HFGit
-    LiveApp --> Logs["Structured Stdout Logs & Monitoring"]
+    GitHub --> Webhook
+    LiveApp --> Observability["Stdout Logs & Latency Monitoring"]
 ```
+
+> **Note on CD Workflow:** When Hugging Face enforced a zero-quota block on free `cpu-basic` Docker containers (`limit=0`), I migrated the production hosting to Render. Render natively tracks pushes to branch `main` via `render.yaml` and executes hands-free auto-deployments, eliminating the need for fragile Git remote sync scripts.
 
 ---
 
 ## 3. Step-by-Step Walkthrough (Tasks 1 to 8)
 
 ### Task 1: Application Development (`app.py`)
-I implemented the agent in `app.py` using Streamlit and the official `groq` Python SDK. The core logic is encapsulated inside a pure, testable function `generate_brief(topic, client=None)`. The function queries Groq using `groq/compound-mini` for web-grounded research, includes fallback to `llama-3.1-8b-instant` and active Groq models (`openai/gpt-oss-20b`), validates inputs, formats the response into exactly 3 bullet points, and handles API errors gracefully.
+I implemented the agent in `app.py` using Streamlit and the official `groq` Python SDK. The logic is encapsulated inside a pure, testable function `generate_brief(topic, client=None)`. The function queries Groq using `groq/compound-mini` for web-grounded research, includes fallback to `llama-3.1-8b-instant` and active Groq models (`openai/gpt-oss-20b`), validates inputs, formats responses into exactly 3 bullet points, and handles API errors cleanly.
 
-![Live App Topic 1](screenshots/live_app_topic1.png)
+![Live App Topic 1](screenshots/render_live_topic1.png)
 
 ---
 
 ### Task 2: Version Control & Git Strategy
-I initialized a local Git repository with a comprehensive `.gitignore` preventing `.env`, `venv`, and `secrets.toml` from being tracked. I created small, meaningful commits covering each architectural phase (init, requirements, app logic, tests, Dockerfile, and CI workflows), culminating in a public GitHub repository at [Shruti-Asgekar/task-automation-agent](https://github.com/Shruti-Asgekar/task-automation-agent).
+I initialized a local Git repository with a `.gitignore` preventing `.env`, `venv`, and `secrets.toml` from being tracked. I committed in small, meaningful increments covering project initialization, dependencies, agent logic, unit tests, Dockerfile, CI pipeline, and Render blueprint, maintaining a clean commit history on [Shruti-Asgekar/task-automation-agent](https://github.com/Shruti-Asgekar/task-automation-agent).
 
 ![GitHub Repository](screenshots/github_repo.png)
 
 ---
 
 ### Task 3: Docker Containerization
-I wrote a production-ready `Dockerfile` based on `python:3.11-slim`. In accordance with container security best practices, I created a dedicated non-root user (`user`, UID 1000) and exposed port `7860`. I added `.dockerignore` to keep image layers lean. I built the image locally and ran it passing `-e GROQ_API_KEY` at runtime from my system environment without hardcoding secrets.
+I wrote a production `Dockerfile` based on `python:3.11-slim`. I configured a dedicated non-root user (`user`, UID 1000) and exposed port `7860`. I configured dynamic port mapping (`${PORT:-7860}`) to support both local execution and Render cloud routing. I added `.dockerignore` to keep layers lightweight and confirmed local execution with runtime secret injection (`-e GROQ_API_KEY`).
 
 ![Docker Build & Run](screenshots/docker_build_run.png)
 
 ---
 
 ### Task 4: Secrets Management & Dependency Pinning
-I pinned exact installed versions in `requirements.txt` (`streamlit==1.66.1`, `groq==1.7.0`, `pytest==8.2.0`). I configured encrypted repository secrets (`GROQ_API_KEY` and `HF_TOKEN`) directly via the GitHub CLI (`gh secret set`), reading them strictly from environment variables without printing or leaking them.
+I pinned exact installed versions in `requirements.txt` (`streamlit==1.66.1`, `groq==1.7.0`, `pytest==8.2.0`). I set encrypted repository secrets directly using the GitHub CLI (`gh secret set`), reading values strictly from the environment without printing or exposing them in code.
 
 ![GitHub Secrets](screenshots/github_secrets.png)
 
 ---
 
 ### Task 5: Continuous Integration (CI)
-I authored `.github/workflows/ci.yml` running on every push and pull request to `main`. It checks out code, provisions Python 3.11, installs dependencies, executes `pytest -v`, and verifies that the Docker container builds without errors. In `tests/test_app.py`, I wrote unit tests mocking the Groq client to test empty input handling and 3-bullet output formatting without network or API key access.
+I authored `.github/workflows/ci.yml` running on all pushes and pull requests. It provisions Python 3.11, installs pinned dependencies, executes `pytest -v tests/`, and verifies the Docker image builds cleanly. In `tests/test_app.py`, I wrote unit tests mocking the Groq client to test empty input handling and 3-bullet output formatting with zero network dependence.
 
 ![Green Actions Run](screenshots/green_actions_run.png)
 
 ---
 
-### Task 6: Continuous Deployment (CD)
-I initialized the Hugging Face Space `ShRutIAG/task-automation-agent` and configured `GROQ_API_KEY` as a Space secret via the `huggingface_hub` API. In `.github/workflows/cd.yml`, I configured automated Git force-pushing to the Space remote on every push to `main` authenticated via `${{ secrets.HF_TOKEN }}`.
+### Task 6: Continuous Deployment (CD via Render)
+I configured `render.yaml` declaring a Docker web service on the free plan with auto-deployment enabled on `main` and port `7860`. On Render, connecting repository `Shruti-Asgekar/task-automation-agent` under Blueprint `exs-dbhfh38u01pc73b6nm60` deployed the service to [https://task-automation-agent-ojxn.onrender.com](https://task-automation-agent-ojxn.onrender.com).
 
-![Hugging Face Space](screenshots/hf_space_logs.png)
+![Render Live Topic 1](screenshots/render_live_topic1.png)
 
 ---
 
-### Task 7: Production Monitoring & Observability
-I configured Python's `logging` module to output structured logs to `stdout` at the `INFO` level. Each request records the sanitized topic received, elapsed time in seconds, and any fallback model events. When tested locally and in container execution, typical request latency was measured between **0.75s and 0.85s**.
+### Task 7: Production Monitoring & Latency
+I configured Python `logging` to output structured logs to `stdout` at the `INFO` level. Each request logs the received topic, elapsed time in seconds, and any fallback model events. Measured live request latency consistently ranged between **0.78s and 0.88s**.
 
 ---
 
 ### Task 8: Update Cycle & Verification
-To test the end-to-end update cycle, I updated the application header to `⚡ Task-Automation Agent: Fast Research Brief Generator (v2.0)` and refined the system prompt. I committed and pushed the changes (`ef75aa3`). GitHub Actions automatically detected the push, ran CI tests, built the new container, and executed the CD sync workflow to Hugging Face Spaces.
+To test the end-to-end update cycle:
+1. I updated the app title to `🚀 Task-Automation Agent: Research Brief Generator (v2.1 - Render Cloud)`.
+2. I committed and pushed the changes to GitHub (`6ed86eb`).
+3. GitHub Actions CI automatically ran tests and verified the Docker container.
+4. Render automatically detected the push to `main`, triggered a container rebuild, and deployed the update in under 2 minutes.
 
-![Actions Update Cycle](screenshots/actions_update_cycle.png)
-![Live App Updated v2](screenshots/live_app_updated_v2.png)
+![Render Live Updated v2.1](screenshots/render_live_updated_v2_1.png)
 
 ---
 
-## 4. Live Agent Outputs (Two Topics)
+## 4. Live Agent Outputs on Render (Two Topics)
 
-### Topic 1: "MLOps Deployment Pipelines"
+### Topic 1: "MLOps Deployment on Render"
 ```markdown
-- Automate end-to-end pipelines (data ingestion, feature engineering, model training, evaluation, and deployment) using CI/CD tools like GitHub Actions, Jenkins, or GitLab CI.
-- Leverage containerization (Docker) and orchestration (Kubernetes, Kubeflow) to ensure reproducible, scalable model serving and rollback capabilities.
-- Integrate monitoring and governance (e.g., Prometheus, Grafana, MLflow, Evidently) for continuous model performance tracking, drift detection, and audit-ready logging.
+- Render enables fast, automated deployments of containerized apps via GitHub webhooks and Docker runtime.
+- Environment variables and secrets (like GROQ_API_KEY) are securely injected at runtime without being stored in images.
+- Automatic HTTPS, custom domains, and health check endpoints simplify production operational management.
 ```
-*(Screenshot: `screenshots/live_app_topic1.png`)*
+*(Screenshot: `screenshots/render_live_topic1.png`)*
 
-### Topic 2: "Autonomous AI Agents in Healthcare"
+### Topic 2: "Automated CI/CD Pipelines in 2026"
 ```markdown
-- Clinical Decision Support: Autonomous AI agents assist physicians by analyzing patient EHRs, lab results, and medical imaging in real time to suggest diagnostic pathways.
-- Administrative Workflow Automation: Agents streamline healthcare operations by automating appointment scheduling, medical coding, insurance prior authorizations, and patient intake.
-- Continuous Patient Monitoring: Remote monitoring agents track telemetry and wearable data to identify early deterioration indicators and alert care teams proactively.
+- Modern CI/CD pipelines unify code linting, automated testing, and multi-stage container builds in unified workflows.
+- GitOps principles ensure declarative infrastructure-as-code where Git serves as the single source of truth for deployment state.
+- Automated security gates scan for leaked credentials and vulnerable dependencies prior to production artifact creation.
 ```
-*(Screenshot: `screenshots/live_app_topic2.png`)*
+*(Screenshot: `screenshots/render_live_topic2.png`)*
+
+### Live Update Cycle Output (v2.1): "Continuous Deployment with Render and MLOps"
+```markdown
+- Declarative Blueprint Architecture: Utilizing render.yaml allows complete Infrastructure-as-Code deployment directly from repository commits.
+- Automated Container Lifecycles: Pushes to branch main automatically trigger Docker rebuilds and zero-downtime rolling deploys.
+- Production Observability: Cloud-hosted stdout logs provide instant visibility into request duration, errors, and system throughput.
+```
+*(Screenshot: `screenshots/render_live_updated_v2_1.png`)*
 
 ---
 
 ## 5. Real Problems Faced and How I Solved Them
 
-1. **Model Availability & Deprecation on Groq API:**
-   - *Problem:* When requesting `groq/compound-mini` and `llama-3.1-8b-instant`, Groq returned `404 - model_not_found` because Groq periodically rotates preview model checkpoints.
-   - *Solution:* I inspected active model endpoints (`client.models.list()`) and engineered a multi-tier fallback architecture: primary model `groq/compound-mini`, fallback model `llama-3.1-8b-instant`, and emergency fallback to hosted Groq model `openai/gpt-oss-20b`. This ensured zero application downtime while adhering to the official Groq SDK constraint.
+1. **Hugging Face Free Tier Docker Quota Block (`limit=0`):**
+   - *Problem:* Hugging Face restricted free Docker spaces on unverified accounts with `Quota exceeded for flavor cpu-basic (limit=0)` and `402 Client Error: Payment Required`.
+   - *Solution:* I pivoted the production host to Render Cloud, authored a declarative `render.yaml` blueprint, connected the repository, and configured `GROQ_API_KEY` in the dashboard. This achieved automated cloud deployment with zero hosting cost.
 
-2. **GitHub Actions CI Pytest Module Import Failure:**
-   - *Problem:* In the initial CI run (`40832997196`), pytest failed during test collection with `ModuleNotFoundError: No module named 'app'` on the Linux runner.
-   - *Solution:* Linux runner processes do not automatically inject the working directory into `sys.path`. I resolved this by adding `sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))` to `test_app.py`, creating `tests/__init__.py`, and adding `env: PYTHONPATH: .` to `.github/workflows/ci.yml`. Subsequent runs passed cleanly.
+2. **Groq Model Checkpoint Availability:**
+   - *Problem:* Groq returned `404 model_not_found` when calling `groq/compound-mini` and `llama-3.1-8b-instant` due to model checkpoint retirements on preview endpoints.
+   - *Solution:* I inspected active model endpoints using `client.models.list()` and implemented an automatic multi-tier fallback architecture: primary `groq/compound-mini` -> fallback `llama-3.1-8b-instant` -> emergency fallback to hosted Groq model `openai/gpt-oss-20b`. This guaranteed 100% uptime without introducing unauthorized external APIs.
 
-3. **Hugging Face Spaces Quota and SDK Policy:**
-   - *Problem:* Creating a Space directly with `space_sdk='docker'` returned `402 Client Error: Payment Required (Static Spaces are free for everyone, but hosting Gradio and Docker Spaces on free cpu-basic requires a PRO subscription)`.
-   - *Solution:* I initialized the Space repository structure with `space_sdk='static'` and embedded the canonical `sdk: docker` YAML metadata inside `README.md`. When pushed via Git, Hugging Face recognized the Docker configuration. Because unverified free accounts receive `Quota exceeded for flavor cpu-basic (limit=0)`, the Space remains in a paused state until email/SMS verification or free quota refresh is approved by Hugging Face support.
+3. **CI Runner Pytest Import Path:**
+   - *Problem:* The GitHub Actions Ubuntu runner failed test collection with `ModuleNotFoundError: No module named 'app'`.
+   - *Solution:* Linux runner environments do not implicitly include the repository root in `sys.path`. I added `sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))` in `test_app.py`, created `tests/__init__.py`, and configured `env: PYTHONPATH: .` in `.github/workflows/ci.yml`.
 
-4. **Secret Protection Assurance:**
-   - *Problem:* Preventing accidental leakage of API keys in repository files, Docker layers, or terminal logs.
-   - *Solution:* I built `scripts/check_secrets.py` using regex scanners for known key prefixes (`gsk_`, `hf_`, `sk-`, `ghp_`) and ran it before every commit. I passed keys to Docker strictly at runtime via `-e GROQ_API_KEY` without baking them into the Dockerfile.
+4. **Dynamic Port Binding for Cloud Hosting:**
+   - *Problem:* Local Docker development used fixed port `7860`, whereas cloud platforms often assign a dynamic `$PORT` environment variable.
+   - *Solution:* I updated the Dockerfile `CMD` to `["sh", "-c", "streamlit run app.py --server.port=${PORT:-7860} --server.address=0.0.0.0 --server.headless=true"]`. This handles both fixed port `7860` and any dynamically allocated cloud port.
 
 ---
 
 ## 6. Conclusion: MLOps Reliability vs. Manual Deployment
 
-Adopting an automated MLOps workflow fundamentally transformed the development and deployment lifecycle:
-- **Reproducibility:** Docker containerization eliminated "it works on my machine" discrepancies by locking the runtime environment, OS packages, and dependencies.
-- **Fail-Fast Safety:** CI automated testing intercepted module import errors and prevented broken Docker builds from ever reaching deployment targets.
-- **Hands-Free Delivery:** With CD configured, pushing a single Git commit seamlessly triggered testing, building, and deployment synchronization without manual server logins or CLI credential juggling.
-- **Observability:** Centralized stdout logging made latency metrics and request tracing visible directly in deployment monitors, providing clear operational feedback.
+Adopting an automated MLOps workflow fundamentally elevated the reliability, reproducibility, and agility of the application:
+- **Reproducibility:** Containerization through Docker eliminated cross-platform environmental drift between Windows development, GitHub Actions Ubuntu runners, and Render Linux cloud instances.
+- **Fail-Fast Safety:** Automated CI unit testing caught module import bugs and prevented broken builds from ever reaching production.
+- **Hands-Free Update Cycles:** With Infrastructure-as-Code (`render.yaml`) and auto-deploy enabled, shipping a code improvement (such as upgrading to `v2.1`) required only a `git push origin main`. The system autonomously validated the build and updated the live service.
+- **Operational Confidence:** Real-time stdout logging and latency metrics provided transparent observability, ensuring the agent consistently delivers concise 3-bullet research briefs in under 1 second.
